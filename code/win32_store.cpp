@@ -1,6 +1,6 @@
-#include "store.h"
-
 #include <Windows.h>
+
+#include "store.cpp"
 
 global_variable bool Running = false;
 
@@ -62,6 +62,14 @@ WinMain(
     // Todo(Carlos): Log error.
   }
 
+  app_memory Memory = {};
+  Memory.PermanentStorageSize = Megabytes(4);
+  Memory.TransientStorageSize = Gigabytes(1);
+  uint64 TotalMemorySize = Memory.PermanentStorageSize + Memory.TransientStorageSize;
+
+  Memory.PermanentStorage = VirtualAlloc(0, TotalMemorySize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+  Memory.TransientStorage = (uint8 *)Memory.PermanentStorage + Memory.PermanentStorageSize;
+
   Running = true;
   while (Running)
   {
@@ -76,6 +84,8 @@ WinMain(
       TranslateMessage(&Message);
       DispatchMessage(&Message);
     }
+
+    AppUpdateHandler(&Memory);
   }
 
   return 0;

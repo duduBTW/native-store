@@ -1,5 +1,10 @@
 #include <stdint.h>
 
+#define Kilobytes(Value) ((Value) * 1024)
+#define Megabytes(Value) (Kilobytes(Value) * 1024)
+#define Gigabytes(Value) (Megabytes(Value) * 1024)
+#define Terabytes(Value) (Gigabytes(Value) * 1024)
+
 #define internal static
 #define local_persist static
 #define global_variable static
@@ -17,3 +22,18 @@ typedef int64_t int64;
 
 typedef float float32;
 typedef double float64;
+
+typedef int32 bool32;
+
+struct app_memory
+{
+  bool32 IsInitialized;
+
+  uint64 PermanentStorageSize;
+  void *PermanentStorage;
+
+  uint64 TransientStorageSize;
+  void *TransientStorage;
+};
+
+void AppUpdateHandler(app_memory *Memory);
