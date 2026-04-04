@@ -94,6 +94,8 @@ void DrawBegin(render_color clearColor)
 
 void DrawEnd()
 {
+  // TODO(Carlos) Don't know if this is the best place to put this.
+  Render();
   gD2D.RenderTarget->EndDraw();
 }
 

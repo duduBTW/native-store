@@ -323,3 +323,10 @@ WinMain(
 
   return 0;
 }
+
+float32 WindowWidth()
+{
+  RECT bounds;
+  GetClientRect(g_Window, &bounds);
+  return bounds.right;
+}

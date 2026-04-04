@@ -1,4 +1,3 @@
-#include "store.h"
 #include "layout.cpp"
 
 bool hasInit = false;
@@ -10,40 +9,34 @@ void AppUpdateHandler(app_memory *Memory)
   {
     hasInit = true;
     gFont = DrawCreateFont(L"Segoe UI", 18.0f);
-    // StartWebView(L"http://example.com/", 0, 0, 40, 0);
+    StartWebView(L"https://store.steampowered.com/?l=portuguese", 0, 0, 48, 0);
   }
 
   DrawBegin(ColorRGBA(30, 30, 30));
-  UiElement el = {
-      .position = {.x = 100, .y = 20},
-      // .size = {.width = 960, .height = 540},
-      .padding = {.top = 10, .left = 20},
+  ELEMENT((UiElement{
+      .size = {.width = FIXED(WindowWidth()), .height = FIT()},
+      .padding = {
+          .top = 4,
+          .right = 4,
+          .bottom = 4,
+          .left = 4,
+      },
       .backgroundColor = ColorRGBA(3, 115, 252),
       .gap = 12,
-  };
-  UiElement el2 = {
-      .size = {.width = 100, .height = 100},
-      .backgroundColor = ColorRGBA(255, 0, 0),
-  };
-  ELEMENT(el)
+  }))
   {
-    ELEMENT(el2) {}
-    ELEMENT(el2) {}
+    ELEMENT((UiElement{
+        .size = {.width = FIXED(100), .height = FIXED(40)},
+        .backgroundColor = ColorRGBA(255, 0, 0),
+    }))
+    {
+    }
+    ELEMENT((UiElement{
+        .size = {.width = FIXED(100), .height = FIXED(40)},
+        .backgroundColor = ColorRGBA(0, 255, 0),
+    }))
+    {
+    }
   }
-  Render();
-  // UiElement layout = {
-  // .position = {.x = 100, .y = 20},
-  // .size = {.width = 960, .height = 540},
-  // .padding = {.top = 10, .left = 20},
-  // .backgroundColor = ColorRGBA(3, 115, 252),
-  // .gap = 12,
-  //     .children = {
-  //         UiElement{
-  //             .size = {.width = 100, .height = 100},
-  //             .backgroundColor = ColorRGBA(255, 0, 0)},
-  //         UiElement{
-  //             .size = {.width = 200, .height = 50},
-  //             .backgroundColor = ColorRGBA(0, 255, 0)}}};
-  // DrawLayout(layout);
   DrawEnd();
 }

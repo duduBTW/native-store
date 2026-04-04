@@ -80,6 +80,8 @@ enum text_valign
 
 struct platform_font; // opaque — implemented per platform
 
+float32 WindowWidth();
+
 // Lifecycle
 void DrawBegin(render_color clearColor);
 void DrawEnd();
@@ -94,6 +96,7 @@ platform_font *DrawCreateFont(const wchar_t *family, float size, bool bold = fal
 void DrawDestroyFont(platform_font *font);
 void DrawText(platform_font *font, const wchar_t *text, float x, float y, float w, float h,
               render_color color, text_align hAlign = TextAlign_Left, text_valign vAlign = TextVAlign_Top);
+
 struct Position
 {
   float32 x, y;
@@ -103,14 +106,25 @@ enum Direction
   ROW = 0,
   COLUMN = 1
 };
+enum SizingType
+{
+  SIZING_FIT = 0,
+  SIZING_FIXED = 1,
+  SIZING_GROW = 2,
+};
 
-// Layout
+struct Sizing
+{
+  SizingType type;
+  float value;
+};
+
 struct UiElement
 {
   Position position;
   struct
   {
-    float32 width, height;
+    Sizing width, height;
   } size;
   struct
   {
@@ -125,6 +139,11 @@ struct UiElement
 
   bool open = true;
 };
+
+#define FIXED(size) \
+  Sizing { .type = SIZING_FIXED, .value = (float)size }
+#define GROW() Sizing{.type = SIZING_GROW, .value = 0}
+#define FIT() Sizing{.type = SIZING_FIT, .value = 0}
 
 #define CONCAT_INNER(a, b) a##b
 #define CONCAT(a, b) CONCAT_INNER(a, b)
