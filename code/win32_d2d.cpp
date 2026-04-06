@@ -95,6 +95,7 @@ void DrawBegin(render_color clearColor)
 void DrawEnd()
 {
   // TODO(Carlos) Don't know if this is the best place to put this.
+  // Render breaks when there are no elements.
   Render();
   gD2D.RenderTarget->EndDraw();
 }
@@ -141,8 +142,26 @@ void DrawDestroyFont(platform_font *font)
   }
 }
 
+text_metrics MeasureText(platform_font *font, const wchar_t *text, float preferredWidth)
+{
+  IDWriteTextLayout *layout = nullptr;
+  gD2D.DWriteFactory->CreateTextLayout(
+      text,
+      (UINT32)wcslen(text),
+      font->Format,
+      preferredWidth,
+      FLT_MAX, // height unconstrained
+      &layout);
+
+  DWRITE_TEXT_METRICS metrics = {};
+  layout->GetMetrics(&metrics);
+  layout->Release();
+
+  return {metrics.width, metrics.height};
+}
+
 void DrawText(platform_font *font, const wchar_t *text,
-              float x, float y, float w, float h,
+              float x, float y, float preferredWidth,
               render_color color, text_align hAlign, text_valign vAlign)
 {
   DWRITE_TEXT_ALIGNMENT hA;
@@ -175,10 +194,21 @@ void DrawText(platform_font *font, const wchar_t *text,
 
   font->Format->SetTextAlignment(hA);
   font->Format->SetParagraphAlignment(vA);
-  SetBrush(color);
 
-  gD2D.RenderTarget->DrawText(
-      text, (UINT32)wcslen(text), font->Format,
-      D2D1::RectF(x, y, x + w, y + h),
+  IDWriteTextLayout *layout = nullptr;
+  gD2D.DWriteFactory->CreateTextLayout(
+      text,
+      (UINT32)wcslen(text),
+      font->Format,
+      preferredWidth,
+      FLT_MAX,
+      &layout);
+
+  SetBrush(color);
+  gD2D.RenderTarget->DrawTextLayout(
+      D2D1::Point2F(x, y),
+      layout,
       gD2D.Brush);
+
+  layout->Release();
 }

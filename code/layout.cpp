@@ -145,9 +145,19 @@ void PositionElementAndChildren(UiElement *element)
 
 void RenderElementAndChildren(UiElement *element)
 {
-  DrawFillRect(element->position.x,
-               element->position.y,
-               element->size.width.value, element->size.height.value, element->backgroundColor);
+  if (element->text)
+  {
+    // TODO(Carlos): finish text implementation, first two args are wrong.
+    DrawText(0, L"",
+             element->position.x, element->position.y,
+             element->size.width.value, element->textColor, TextAlign_Left, TextVAlign_Top);
+  }
+  else
+  {
+    DrawFillRect(element->position.x,
+                 element->position.y,
+                 element->size.width.value, element->size.height.value, element->backgroundColor);
+  }
 
   for (int i = 0; i < element->children.size(); i++)
   {

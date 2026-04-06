@@ -9,11 +9,11 @@ void AppUpdateHandler(app_memory *Memory)
   {
     hasInit = true;
     gFont = DrawCreateFont(L"Segoe UI", 18.0f);
-    StartWebView(L"https://store.steampowered.com/?l=portuguese", 0, 0, 48, 0);
+    // StartWebView(L"https://store.steampowered.com/?l=portuguese", 0, 0, 48, 0);
   }
 
   DrawBegin(ColorRGBA(30, 30, 30));
-  ELEMENT((UiElement{
+  DIV((UiElement{
       .size = {.width = FIXED(WindowWidth()), .height = FIT()},
       .padding = {
           .top = 4,
@@ -25,18 +25,21 @@ void AppUpdateHandler(app_memory *Memory)
       .gap = 12,
   }))
   {
-    ELEMENT((UiElement{
+    DIV((UiElement{
         .size = {.width = FIXED(100), .height = FIXED(40)},
         .backgroundColor = ColorRGBA(255, 0, 0),
     }))
     {
+      // TYPOGRAPHY("pog", TextConfig{});
     }
-    ELEMENT((UiElement{
+    DIV((UiElement{
         .size = {.width = FIXED(100), .height = FIXED(40)},
         .backgroundColor = ColorRGBA(0, 255, 0),
     }))
     {
     }
   }
+  // text_metrics metrics = MeasureText(gFont, L"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam quis efficitur neque, sit amet ultricies odio. Pellentesque elementum erat nulla, eget condimentum leo rutrum ac. ", 100);
+  // DrawText(gFont, L"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam quis efficitur neque, sit amet ultricies odio. Pellentesque elementum erat nulla, eget condimentum leo rutrum ac. ", 40, 40, 100, Color(1, 1, 1), TextAlign_Left, TextVAlign_Top);
   DrawEnd();
 }

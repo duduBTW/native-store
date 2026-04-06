@@ -78,8 +78,6 @@ enum text_valign
   TextVAlign_Bottom,
 };
 
-struct platform_font; // opaque — implemented per platform
-
 float32 WindowWidth();
 
 // Lifecycle
@@ -92,10 +90,19 @@ void DrawOutlineRect(float x, float y, float w, float h, render_color color, flo
 void DrawFillRoundRect(float x, float y, float w, float h, float rx, float ry, render_color color);
 
 // Text
+struct platform_font; // opaque — implemented per platform
+struct text_metrics
+{
+  float width;
+  float height;
+};
+
 platform_font *DrawCreateFont(const wchar_t *family, float size, bool bold = false, bool italic = false);
 void DrawDestroyFont(platform_font *font);
-void DrawText(platform_font *font, const wchar_t *text, float x, float y, float w, float h,
-              render_color color, text_align hAlign = TextAlign_Left, text_valign vAlign = TextVAlign_Top);
+void DrawText(platform_font *font, const wchar_t *text,
+              float x, float y, float preferredWidth,
+              render_color color, text_align hAlign, text_valign vAlign);
+text_metrics MeasureText(platform_font *font, const wchar_t *text, float preferredWidth);
 
 struct Position
 {
@@ -119,6 +126,12 @@ struct Sizing
   float value;
 };
 
+struct TextConfig
+{
+  float32 fontSize;
+  render_color textColor;
+};
+
 struct UiElement
 {
   Position position;
@@ -137,6 +150,11 @@ struct UiElement
   std::vector<UiElement> children;
   int parentIndex = -1;
 
+  // text
+  const char *text = nullptr;
+  float32 fontSize = 16.0f;
+  render_color textColor = ColorRGBA(255, 255, 255);
+
   bool open = true;
 };
 
@@ -148,7 +166,18 @@ struct UiElement
 #define CONCAT_INNER(a, b) a##b
 #define CONCAT(a, b) CONCAT_INNER(a, b)
 
-#define ELEMENT(config)                                                 \
+#define DIV(config)                                                     \
   for (UiElement CONCAT(_el, __LINE__) = (OpenElement(config), config); \
        CONCAT(_el, __LINE__).open;                                      \
        (CONCAT(_el, __LINE__).open = false, CloseElement(CONCAT(_el, __LINE__))))
+
+#define TYPOGRAPHY(str, config)                       \
+  {                                                   \
+    UiElement _textEl = {};                           \
+    _textEl.size = {.width = FIT(), .height = FIT()}; \
+    _textEl.text = (str);                             \
+    _textEl.fontSize = (config).fontSize;             \
+    _textEl.textColor = (config).textColor;           \
+    OpenElement(_textEl);                             \
+    CloseElement(_textEl);                            \
+  }
