@@ -11,6 +11,7 @@ global_variable ICoreWebView2Environment *g_WebViewEnvironment = nullptr;
 global_variable RECT g_WebViewBounds = {};
 global_variable const wchar_t *g_PendingURL = nullptr;
 global_variable HWND g_Window = nullptr;
+global_variable PlatformState win32State = {};
 
 struct WebViewCtrlHandler;
 struct WebViewEnvHandler;
@@ -107,6 +108,8 @@ HRESULT STDMETHODCALLTYPE WebViewEnvHandler::Invoke(HRESULT result, ICoreWebView
 
 void DestroyWebView()
 {
+  win32State.isWebviewOpen = false;
+
   if (g_WebView)
   {
     g_WebView->Release();
@@ -167,6 +170,7 @@ void StartWebView(const wchar_t *url, long bottom, long left, long top, long rig
 
   g_WebViewBounds = bounds;
   StartWebViewInternal(g_Window, url);
+  win32State.isWebviewOpen = true;
   // g_WebViewController->put_Bounds(bounds);
 }
 
@@ -295,7 +299,7 @@ WinMain(
     MessageBoxA(g_Window, "WebView2 runtime not found.", "Error", MB_OK);
   }
 
-  app_memory Memory = {};
+  AppMemory Memory = {};
   Memory.PermanentStorageSize = Megabytes(4);
   Memory.TransientStorageSize = Gigabytes(1);
   uint64 TotalMemorySize = Memory.PermanentStorageSize + Memory.TransientStorageSize;
@@ -318,7 +322,7 @@ WinMain(
       DispatchMessage(&Message);
     }
 
-    AppUpdateHandler(&Memory);
+    AppUpdateHandler(&win32State, &Memory);
   }
 
   return 0;

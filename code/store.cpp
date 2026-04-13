@@ -1,15 +1,20 @@
 #include "layout.cpp"
 
-bool hasInit = false;
-platform_font *gFont;
+global_variable StoreState appState = {
+    .activePage = PAGE_STORE,
+};
 
-void AppUpdateHandler(app_memory *Memory)
+void AppUpdateHandler(PlatformState *platformState, AppMemory *Memory)
 {
-    if (!hasInit)
+    if (!appState.hasInit)
     {
-        hasInit = true;
-        gFont = DrawCreateFont(L"Segoe UI", 18.0f);
-        // StartWebView(L"https://store.steampowered.com/?l=portuguese", 0, 0, 48, 0);
+        appState.hasInit = true;
+        appState.globalFont = DrawCreateFont(L"Segoe UI", 18.0f);
+    }
+
+    if (!platformState->isWebviewOpen && appState.activePage == PAGE_STORE)
+    {
+        StartWebView(L"https://store.steampowered.com/?l=portuguese", 0, 0, 48, 0);
     }
 
     DrawBegin(ColorRGBA(30, 30, 30));
@@ -29,24 +34,20 @@ void AppUpdateHandler(app_memory *Memory)
     }))
     {
         DIV((UiElement{
-            .size = {.width = GROW()},
             .backgroundColor = ColorRGBA(255, 0, 0),
         }))
         {
             TYPOGRAPHY(L"STORE", (TextConfig{
                                      .textColor = ColorRGBA(255, 255, 255),
-                                     .textFont = gFont,
                                  }));
         }
         DIV((UiElement{
-            .size = {.width = FIXED(200)},
             .backgroundColor = ColorRGBA(0, 255, 0),
         }))
         {
-            TYPOGRAPHY(L"Lorem ipsum dolor sit amet, consectetur adipiscing elit",
+            TYPOGRAPHY(L"LIBRARY",
                        (TextConfig{
                            .textColor = ColorRGBA(255, 255, 255),
-                           .textFont = gFont,
                        }));
         }
     }

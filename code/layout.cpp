@@ -15,11 +15,16 @@ int stackTop = 0;
 
 void OpenElement(UiElement config)
 {
-  config.parentIndex = stackTop > 0 ? stackTop - 1 : -1;
+  bool isFirstElement = stackTop == 0;
+  config.parentIndex = isFirstElement ? -1 : stackTop - 1;
   if (config.size.minWidth == 0.0f)
+  {
     config.size.minWidth = config.size.width.value;
+  }
   if (config.size.minHeight == 0.0f)
+  {
     config.size.minHeight = config.size.height.value;
+  }
 
   stack[stackTop] = config;
   stackTop++;
@@ -129,21 +134,6 @@ void FitSizeHeight(UiElement *element)
   default:
     break;
   }
-}
-
-void CloseElement()
-{
-  stackTop--;
-  UiElement &element = stack[stackTop];
-
-  if (element.parentIndex != -1)
-  {
-    UiElement &parent = stack[element.parentIndex];
-    parent.children.push_back(element);
-    element.parent = &parent;
-  }
-
-  FitSizeWidth(&element);
 }
 
 void GrowChildElements(UiElement *element)
@@ -419,7 +409,6 @@ void RenderElementAndChildren(UiElement *element)
 {
   if (element->text)
   {
-    // TODO(Carlos): finish text implementation, first two args are wrong.
     DrawText(element->textFont, element->text,
              element->position.x, element->position.y,
              element->size.width.value, element->textColor, TextAlign_Left, TextVAlign_Top);
@@ -482,4 +471,26 @@ void Render()
   // Clean up
   memset(stack, 0, sizeof(stack));
   stackTop = 0;
+}
+
+void CloseElement()
+{
+  stackTop--;
+  UiElement &element = stack[stackTop];
+
+  if (element.parentIndex != -1)
+  {
+    UiElement &parent = stack[element.parentIndex];
+    parent.children.push_back(element);
+    element.parent = &parent;
+  }
+
+  FitSizeWidth(&element);
+
+  // is root element
+  if (element.parentIndex == -1)
+  {
+    // TODO(Carlos) Render breaks when there are no elements.
+    Render();
+  }
 }

@@ -94,9 +94,6 @@ void DrawBegin(render_color clearColor)
 
 void DrawEnd()
 {
-  // TODO(Carlos) Don't know if this is the best place to put this.
-  // Render breaks when there are no elements.
-  Render();
   gD2D.RenderTarget->EndDraw();
 }
 
@@ -128,7 +125,6 @@ platform_font *DrawCreateFont(const wchar_t *family, float size, bool bold, bool
   gD2D.DWriteFactory->CreateTextFormat(
       family, nullptr, weight, style,
       DWRITE_FONT_STRETCH_NORMAL, size, L"", &font->Format);
-
   return font;
 }
 

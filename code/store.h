@@ -1,6 +1,13 @@
 #include <stdint.h>
 #include <vector>
 
+// TODO(Carlos): Remove on prod builds.
+#define Assert(Expression) \
+  if (!(Expression))       \
+  {                        \
+    *(int *)0 = 0;         \
+  }
+
 #define Kilobytes(Value) ((Value) * 1024)
 #define Megabytes(Value) (Kilobytes(Value) * 1024)
 #define Gigabytes(Value) (Megabytes(Value) * 1024)
@@ -26,7 +33,7 @@ typedef double float64;
 
 typedef int32 bool32;
 
-struct app_memory
+struct AppMemory
 {
   bool32 IsInitialized;
 
@@ -37,7 +44,12 @@ struct app_memory
   void *TransientStorage;
 };
 
-void AppUpdateHandler(app_memory *Memory);
+struct PlatformState
+{
+  bool32 isWebviewOpen;
+};
+
+void AppUpdateHandler(PlatformState *platformState, AppMemory *Memory);
 
 // Webview
 struct PlatformWebView
@@ -176,16 +188,32 @@ struct UiElement
        CONCAT(_el, __LINE__).open;                                      \
        (CONCAT(_el, __LINE__).open = false, CloseElement()))
 
-#define TYPOGRAPHY(str, config)                                     \
-  {                                                                 \
-    UiElement _textEl = {};                                         \
-    text_metrics textSize = MeasureText((config).textFont, str, 0); \
-    Sizing width = {.type = SIZING_FIT, .value = textSize.width};   \
-    _textEl.size = {width, FIT(), textSize.minWidth};               \
-    _textEl.text = (str);                                           \
-    _textEl.fontSize = (config).fontSize;                           \
-    _textEl.textColor = (config).textColor;                         \
-    _textEl.textFont = (config).textFont;                           \
-    OpenElement(_textEl);                                           \
-    CloseElement();                                                 \
+#define TYPOGRAPHY(str, config)                                                        \
+  {                                                                                    \
+    UiElement _textEl = {};                                                            \
+    platform_font *font = (config).textFont ? (config).textFont : appState.globalFont; \
+    Assert(font);                                                                      \
+    text_metrics textSize = MeasureText(font, str, 0);                                 \
+    Sizing width = {.type = SIZING_FIT, .value = textSize.width};                      \
+    _textEl.size = {width, FIT(), textSize.minWidth};                                  \
+    _textEl.text = (str);                                                              \
+    _textEl.fontSize = (config).fontSize;                                              \
+    _textEl.textColor = (config).textColor;                                            \
+    _textEl.textFont = font;                                                           \
+    OpenElement(_textEl);                                                              \
+    CloseElement();                                                                    \
   }
+
+// App specific logic
+enum ActivePage
+{
+  PAGE_STORE,
+  PAGE_LIBRARY
+};
+
+struct StoreState
+{
+  bool32 hasInit;
+  ActivePage activePage;
+  platform_font *globalFont;
+};
