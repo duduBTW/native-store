@@ -144,20 +144,42 @@ void DrawDestroyFont(platform_font *font)
 
 text_metrics MeasureText(platform_font *font, const wchar_t *text, float preferredWidth)
 {
+  float layoutWidth = (preferredWidth == 0.0f) ? FLT_MAX : preferredWidth;
+
   IDWriteTextLayout *layout = nullptr;
   gD2D.DWriteFactory->CreateTextLayout(
       text,
       (UINT32)wcslen(text),
       font->Format,
-      preferredWidth,
-      FLT_MAX, // height unconstrained
+      layoutWidth,
+      FLT_MAX,
       &layout);
+
+  if (preferredWidth == 0.0f)
+    layout->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
 
   DWRITE_TEXT_METRICS metrics = {};
   layout->GetMetrics(&metrics);
+
+  // Compute min width: re-layout with wrapping at every opportunity
+  float minWidth = 0.0f;
+  IDWriteTextLayout *minLayout = nullptr;
+  gD2D.DWriteFactory->CreateTextLayout(
+      text,
+      (UINT32)wcslen(text),
+      font->Format,
+      0.0f, // zero width forces wrapping at every word
+      FLT_MAX,
+      &minLayout);
+
+  DWRITE_TEXT_METRICS minMetrics = {};
+  minLayout->GetMetrics(&minMetrics);
+  minWidth = minMetrics.width;
+  minLayout->Release();
+
   layout->Release();
 
-  return {metrics.width, metrics.height};
+  return {metrics.width, metrics.height, minWidth};
 }
 
 void DrawText(platform_font *font, const wchar_t *text,
@@ -196,13 +218,16 @@ void DrawText(platform_font *font, const wchar_t *text,
   font->Format->SetParagraphAlignment(vA);
 
   IDWriteTextLayout *layout = nullptr;
+  float layoutWidth = (preferredWidth == 0.0f) ? FLT_MAX : preferredWidth;
   gD2D.DWriteFactory->CreateTextLayout(
       text,
       (UINT32)wcslen(text),
       font->Format,
-      preferredWidth,
+      layoutWidth,
       FLT_MAX,
       &layout);
+
+  layout->SetWordWrapping(DWRITE_WORD_WRAPPING_WRAP);
 
   SetBrush(color);
   gD2D.RenderTarget->DrawTextLayout(

@@ -95,6 +95,7 @@ struct text_metrics
 {
   float width;
   float height;
+  float minWidth;
 };
 
 platform_font *DrawCreateFont(const wchar_t *family, float size, bool bold = false, bool italic = false);
@@ -130,6 +131,7 @@ struct TextConfig
 {
   float32 fontSize;
   render_color textColor;
+  platform_font *textFont;
 };
 
 struct UiElement
@@ -138,6 +140,7 @@ struct UiElement
   struct
   {
     Sizing width, height;
+    float32 minWidth, minHeight;
   } size;
   struct
   {
@@ -148,12 +151,14 @@ struct UiElement
   float32 gap;
 
   std::vector<UiElement> children;
+  UiElement *parent;
   int parentIndex = -1;
 
   // text
-  const char *text = nullptr;
+  const wchar_t *text = nullptr;
   float32 fontSize = 16.0f;
   render_color textColor = ColorRGBA(255, 255, 255);
+  platform_font *textFont;
 
   bool open = true;
 };
@@ -169,15 +174,18 @@ struct UiElement
 #define DIV(config)                                                     \
   for (UiElement CONCAT(_el, __LINE__) = (OpenElement(config), config); \
        CONCAT(_el, __LINE__).open;                                      \
-       (CONCAT(_el, __LINE__).open = false, CloseElement(CONCAT(_el, __LINE__))))
+       (CONCAT(_el, __LINE__).open = false, CloseElement()))
 
-#define TYPOGRAPHY(str, config)                       \
-  {                                                   \
-    UiElement _textEl = {};                           \
-    _textEl.size = {.width = FIT(), .height = FIT()}; \
-    _textEl.text = (str);                             \
-    _textEl.fontSize = (config).fontSize;             \
-    _textEl.textColor = (config).textColor;           \
-    OpenElement(_textEl);                             \
-    CloseElement(_textEl);                            \
+#define TYPOGRAPHY(str, config)                                     \
+  {                                                                 \
+    UiElement _textEl = {};                                         \
+    text_metrics textSize = MeasureText((config).textFont, str, 0); \
+    Sizing width = {.type = SIZING_FIT, .value = textSize.width};   \
+    _textEl.size = {width, FIT(), textSize.minWidth};               \
+    _textEl.text = (str);                                           \
+    _textEl.fontSize = (config).fontSize;                           \
+    _textEl.textColor = (config).textColor;                         \
+    _textEl.textFont = (config).textFont;                           \
+    OpenElement(_textEl);                                           \
+    CloseElement();                                                 \
   }
