@@ -52,7 +52,7 @@ void SetSizingValue(Sizing *size, float32 value)
   size->value = value;
 }
 
-float32 ElementChildGap(UiElement *element)
+float32 ElementChildrenGap(UiElement *element)
 {
   return (element->children.size() - 1) * element->gap;
 }
@@ -60,7 +60,7 @@ float32 ElementChildGap(UiElement *element)
 void FitSizeWidth(UiElement *element)
 {
   SetSizingValuePlus(&element->size.width, element->padding.left + element->padding.right);
-  float32 childGap = ElementChildGap(element);
+  float32 childGap = ElementChildrenGap(element);
 
   if (element->direction == ROW)
   {
@@ -102,7 +102,7 @@ void FitSizeHeight(UiElement *element)
   }
 
   SetSizingValuePlus(&element->size.height, element->padding.top + element->padding.bottom);
-  float32 childGap = ElementChildGap(element);
+  float32 childGap = ElementChildrenGap(element);
 
   if (element->direction == COLUMN)
   {
@@ -382,10 +382,32 @@ void GrowChildElementsHeight(UiElement *element)
   }
 }
 
+// TODO(Carlos): Add column main/cross axis alignment;
 void PositionElementAndChildren(UiElement *element)
 {
   float32 lastY = element->position.y + element->padding.top;
   float32 lastX = element->position.x + element->padding.left;
+
+  // mais axis
+  if (element->direction == ROW && element->mainAxisAlignment != ALIGNMENT_START)
+  {
+    float32 totalChildrenWidth = ElementChildrenGap(element);
+
+    for (int i = 0; i < element->children.size(); i++)
+    {
+      totalChildrenWidth += element->children[i].size.width.value;
+    }
+
+    float32 lastXAlignmentOffset =
+        (element->size.width.value - (element->padding.right + element->padding.left)) - totalChildrenWidth;
+    if (element->mainAxisAlignment == ALIGNMENT_CENTER)
+    {
+      lastXAlignmentOffset = (lastXAlignmentOffset / 2);
+    }
+
+    lastX += lastXAlignmentOffset;
+  }
+
   for (int i = 0; i < element->children.size(); i++)
   {
     UiElement &child = element->children[i];
@@ -395,6 +417,21 @@ void PositionElementAndChildren(UiElement *element)
     if (element->direction == ROW)
     {
       lastX += element->gap + child.size.width.value;
+
+      if (element->crossaxisAlignment != ALIGNMENT_START)
+      {
+        float32 yAlignmentOffset =
+            (element->size.height.value - (element->padding.top + element->padding.bottom)) -
+            child.size.height.value;
+
+        if (element->crossaxisAlignment == ALIGNMENT_CENTER)
+        {
+          yAlignmentOffset = yAlignmentOffset / 2;
+        }
+
+        child.position.y +=
+            yAlignmentOffset;
+      }
     }
     if (element->direction == COLUMN)
     {

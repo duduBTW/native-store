@@ -146,32 +146,45 @@ struct TextConfig
   platform_font *textFont;
 };
 
+enum Alignment
+{
+  ALIGNMENT_START = 0,
+  ALIGNMENT_CENTER,
+  ALIGNMENT_END,
+};
+
 struct UiElement
 {
   Position position;
+
   struct
   {
     Sizing width, height;
     float32 minWidth, minHeight;
   } size;
+
   struct
   {
     float32 top, right, bottom, left;
   } padding;
+
   render_color backgroundColor;
-  Direction direction;
+
+  // layout
   float32 gap;
+  Direction direction;
+  Alignment mainAxisAlignment;
+  Alignment crossaxisAlignment;
+
+  // text
+  const wchar_t *text;
+  float32 fontSize;
+  render_color textColor;
+  platform_font *textFont;
 
   std::vector<UiElement> children;
   UiElement *parent;
   int parentIndex = -1;
-
-  // text
-  const wchar_t *text = nullptr;
-  float32 fontSize = 16.0f;
-  render_color textColor = ColorRGBA(255, 255, 255);
-  platform_font *textFont;
-
   bool open = true;
 };
 

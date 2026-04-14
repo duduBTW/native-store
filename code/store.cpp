@@ -21,7 +21,6 @@ void AppUpdateHandler(PlatformState *platformState, AppMemory *Memory)
     DIV((UiElement{
         .size = {
             .width = FIXED(WindowWidth()),
-            .height = FIT(),
         },
         .padding = {
             .top = 4,
@@ -31,6 +30,7 @@ void AppUpdateHandler(PlatformState *platformState, AppMemory *Memory)
         },
         .backgroundColor = ColorRGBA(3, 115, 252),
         .gap = 12,
+
     }))
     {
         DIV((UiElement{
