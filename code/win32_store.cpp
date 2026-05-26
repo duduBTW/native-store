@@ -4,6 +4,10 @@
 #include "store.cpp"
 #include "win32_d2d.cpp"
 
+// TODO(Carlos): See if I can convert this to float32 without issues;
+#define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
+#define GET_Y_LPARAM(lp) ((int)(short)HIWORD(lp))
+
 global_variable bool Running = false;
 global_variable ICoreWebView2 *g_WebView = nullptr;
 global_variable ICoreWebView2Controller *g_WebViewController = nullptr;
@@ -110,17 +114,24 @@ void DestroyWebView()
 {
   win32State.isWebviewOpen = false;
 
+  if (g_WebViewController)
+  {
+    g_WebViewController->put_IsVisible(FALSE);
+    g_WebViewController->Close();
+    g_WebViewController->Release();
+    g_WebViewController = nullptr;
+  }
+
   if (g_WebView)
   {
     g_WebView->Release();
     g_WebView = nullptr;
   }
-  if (g_WebViewController)
-  {
-    g_WebViewController->Close(); // detaches the child HWND
-    g_WebViewController->Release();
-    g_WebViewController = nullptr;
-  }
+
+  EnumChildWindows(g_Window, [](HWND child, LPARAM) -> BOOL
+                   {
+        ShowWindow(child, SW_HIDE);
+        return TRUE; }, 0);
 }
 
 internal void StartWebViewInternal(HWND Window, const wchar_t *url)
@@ -195,6 +206,18 @@ internal LRESULT MainWindowCallback(HWND Window,
     }
     break;
   }
+  case WM_MOUSEMOVE:
+  {
+    win32State.xMousePos = GET_X_LPARAM(LParam);
+    win32State.yMousePos = GET_Y_LPARAM(LParam);
+    break;
+  }
+
+  case WM_LBUTTONDOWN:
+  {
+    win32State.isClicked = true;
+    break;
+  }
 
     // case WM_PAINT:
     // {
@@ -264,7 +287,7 @@ WinMain(
   windowClass.style = CS_OWNDC | CS_VREDRAW;
   windowClass.lpfnWndProc = MainWindowCallback;
   windowClass.hInstance = instance;
-  windowClass.lpszClassName = "HandmadeHeroWindowClass";
+  windowClass.lpszClassName = "NativeStoreWindowClass";
 
   if (!RegisterClassA(&windowClass))
   {
@@ -296,7 +319,8 @@ WinMain(
 
   if (FAILED(hr))
   {
-    MessageBoxA(g_Window, "WebView2 runtime not found.", "Error", MB_OK);
+    // MessageBoxA(g_Window, "WebView2 runtime not found.", "Error", MB_OK);
+    // Todo(Carlos): Log error.
   }
 
   AppMemory Memory = {};
@@ -310,6 +334,9 @@ WinMain(
   Running = true;
   while (Running)
   {
+    // Todo: Clear up all  temp state instead of manyally.
+    win32State.isClicked = false;
+
     MSG Message;
     while (PeekMessage(&Message, 0, 0, 0, PM_REMOVE))
     {
@@ -333,4 +360,11 @@ float32 WindowWidth()
   RECT bounds;
   GetClientRect(g_Window, &bounds);
   return bounds.right;
+}
+
+float32 WindowHeight()
+{
+  RECT bounds;
+  GetClientRect(g_Window, &bounds);
+  return bounds.bottom;
 }

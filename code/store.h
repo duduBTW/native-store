@@ -44,12 +44,20 @@ struct AppMemory
   void *TransientStorage;
 };
 
+// permanent and state that needs to be clared every frame should be separated.
 struct PlatformState
 {
+  // perm
   bool32 isWebviewOpen;
+
+  // temp
+  bool isClicked;
+  int xMousePos;
+  int yMousePos;
 };
 
 void AppUpdateHandler(PlatformState *platformState, AppMemory *Memory);
+void Events();
 
 // Webview
 struct PlatformWebView
@@ -91,6 +99,7 @@ enum text_valign
 };
 
 float32 WindowWidth();
+float32 WindowHeight();
 
 // Lifecycle
 void DrawBegin(render_color clearColor);
@@ -101,8 +110,22 @@ void DrawFillRect(float x, float y, float w, float h, render_color color);
 void DrawOutlineRect(float x, float y, float w, float h, render_color color, float strokeWidth = 1.0f);
 void DrawFillRoundRect(float x, float y, float w, float h, float rx, float ry, render_color color);
 
+// Image
+struct platform_image;
+struct image_dimensions
+{
+  uint32_t width;
+  uint32_t height;
+  uint32_t aspectRatio;
+};
+
+platform_image *DrawLoadImage(const wchar_t *path);
+void DrawDestroyImage(platform_image *image);
+void DrawImage(platform_image *image, float x, float y, float w, float h);
+image_dimensions ImageDimensions(platform_image *image);
+
 // Text
-struct platform_font; // opaque — implemented per platform
+struct platform_font;
 struct text_metrics
 {
   float width;
@@ -146,6 +169,12 @@ struct TextConfig
   platform_font *textFont;
 };
 
+struct ImageConfig
+{
+  Sizing width;
+  Sizing height;
+};
+
 enum Alignment
 {
   ALIGNMENT_START = 0,
@@ -156,6 +185,7 @@ enum Alignment
 struct UiElement
 {
   Position position;
+  const wchar_t *id;
 
   struct
   {
@@ -175,6 +205,9 @@ struct UiElement
   Direction direction;
   Alignment mainAxisAlignment;
   Alignment crossaxisAlignment;
+
+  // image
+  const wchar_t *imagePath;
 
   // text
   const wchar_t *text;
@@ -217,6 +250,17 @@ struct UiElement
     CloseElement();                                                                    \
   }
 
+#define IMAGE(url, config)                    \
+  {                                           \
+    UiElement _imageEl = {};                  \
+    Assert(url);                              \
+    _imageEl.imagePath = (url);               \
+    _imageEl.size.width = ((config).width);   \
+    _imageEl.size.height = ((config).height); \
+    OpenElement(_imageEl);                    \
+    CloseElement();                           \
+  }
+
 // App specific logic
 enum ActivePage
 {
@@ -224,9 +268,21 @@ enum ActivePage
   PAGE_LIBRARY
 };
 
+struct Game
+{
+  const wchar_t *Name;
+
+  struct
+  {
+    const wchar_t *Icon;
+    const wchar_t *LibraryHero;
+  } Image;
+};
+
 struct StoreState
 {
   bool32 hasInit;
   ActivePage activePage;
   platform_font *globalFont;
+  Game *selectedGame;
 };

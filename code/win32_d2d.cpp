@@ -1,5 +1,7 @@
 #include <d2d1.h>
 #include <dwrite.h>
+#include <wincodec.h>
+#pragma comment(lib, "windowscodecs.lib")
 #pragma comment(lib, "d2d1.lib")
 #pragma comment(lib, "dwrite.lib")
 
@@ -13,6 +15,7 @@ struct win32_d2d_state
   ID2D1HwndRenderTarget *RenderTarget;
   IDWriteFactory *DWriteFactory;
   ID2D1SolidColorBrush *Brush;
+  IWICImagingFactory *WICFactory;
 };
 
 global_variable win32_d2d_state gD2D = {};
@@ -43,8 +46,16 @@ bool Win32D2DInit(HWND window)
   if (FAILED(hr))
     return false;
 
-  gD2D.RenderTarget->CreateSolidColorBrush(D2D1::ColorF(0, 0, 0), &gD2D.Brush);
-  return true;
+  gD2D.RenderTarget->CreateSolidColorBrush(D2D1::ColorF(0, 0, 0), &gD2D.Brush); // só uma vez
+
+  hr = CoCreateInstance(
+      CLSID_WICImagingFactory, nullptr,
+      CLSCTX_INPROC_SERVER,
+      IID_PPV_ARGS(&gD2D.WICFactory));
+  if (FAILED(hr))
+    return false;
+
+  return true; // só um
 }
 
 void Win32D2DResize(uint32 width, uint32 height)
@@ -55,6 +66,12 @@ void Win32D2DResize(uint32 width, uint32 height)
 
 void Win32D2DDestroy()
 {
+  if (gD2D.WICFactory)
+  {
+    gD2D.WICFactory->Release();
+    gD2D.WICFactory = nullptr;
+  }
+
   if (gD2D.Brush)
   {
     gD2D.Brush->Release();
@@ -232,4 +249,94 @@ void DrawText(platform_font *font, const wchar_t *text,
       gD2D.Brush);
 
   layout->Release();
+}
+
+struct platform_image
+{
+  ID2D1Bitmap *Bitmap;
+};
+
+image_dimensions ImageDimensions(platform_image *image)
+{
+  Assert(image);
+  image_dimensions dimensions = {};
+
+  if (!image || !image->Bitmap)
+    return dimensions;
+
+  D2D1_SIZE_U size = image->Bitmap->GetPixelSize();
+
+  dimensions.width = size.width;
+  dimensions.height = size.height;
+
+  dimensions.aspectRatio =
+      size.height != 0
+          ? (float)size.width / (float)size.height
+          : 0.0f;
+
+  return dimensions;
+}
+
+platform_image *DrawLoadImage(const wchar_t *path)
+{
+  IWICBitmapDecoder *decoder = nullptr;
+  IWICBitmapFrameDecode *frame = nullptr;
+  IWICFormatConverter *converter = nullptr;
+
+  platform_image *image = new platform_image{};
+
+  HRESULT hr = gD2D.WICFactory->CreateDecoderFromFilename(
+      path, nullptr, GENERIC_READ,
+      WICDecodeMetadataCacheOnLoad, &decoder);
+  if (FAILED(hr))
+    goto cleanup;
+
+  hr = decoder->GetFrame(0, &frame);
+  if (FAILED(hr))
+    goto cleanup;
+
+  hr = gD2D.WICFactory->CreateFormatConverter(&converter);
+  if (FAILED(hr))
+    goto cleanup;
+
+  hr = converter->Initialize(
+      frame,
+      GUID_WICPixelFormat32bppPBGRA,
+      WICBitmapDitherTypeNone, nullptr,
+      0.0f, WICBitmapPaletteTypeMedianCut);
+  if (FAILED(hr))
+    goto cleanup;
+
+  gD2D.RenderTarget->CreateBitmapFromWicBitmap(converter, nullptr, &image->Bitmap);
+
+cleanup:
+  if (converter)
+    converter->Release();
+  if (frame)
+    frame->Release();
+  if (decoder)
+    decoder->Release();
+
+  return image;
+}
+
+void DrawDestroyImage(platform_image *image)
+{
+  if (image)
+  {
+    if (image->Bitmap)
+      image->Bitmap->Release();
+    delete image;
+  }
+}
+
+void DrawImage(platform_image *image, float x, float y, float w, float h)
+{
+  if (!image || !image->Bitmap)
+    return;
+  gD2D.RenderTarget->DrawBitmap(
+      image->Bitmap,
+      D2D1::RectF(x, y, x + w, y + h),
+      1.0f,
+      D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
 }

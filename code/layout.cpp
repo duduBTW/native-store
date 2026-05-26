@@ -1,4 +1,6 @@
-#include "store.h"
+#include <unordered_map>
+#include <vector>
+#include <string>
 
 float Max(float a, float b)
 {
@@ -11,7 +13,12 @@ float Min(float a, float b)
 }
 
 UiElement stack[256];
+UiElement *root;
 int stackTop = 0;
+
+// Images
+std::unordered_map<std::wstring, platform_image *> loadedImages;
+std::unordered_map<std::wstring, bool> currentImages;
 
 void OpenElement(UiElement config)
 {
@@ -104,6 +111,12 @@ void FitSizeHeight(UiElement *element)
   SetSizingValuePlus(&element->size.height, element->padding.top + element->padding.bottom);
   float32 childGap = ElementChildrenGap(element);
 
+  if (element->imagePath && !element->size.height.value)
+  {
+    image_dimensions dimensions = ImageDimensions(loadedImages[element->imagePath]);
+    SetSizingValue(&element->size.height, element->size.width.value / dimensions.aspectRatio);
+  }
+
   if (element->direction == COLUMN)
   {
     SetSizingValuePlus(&element->size.height, childGap);
@@ -142,12 +155,6 @@ void GrowChildElements(UiElement *element)
   float32 childGaps = (element->children.size() - 1) * element->gap;
   remainderSize -= element->padding.left + element->padding.right + childGaps;
 
-  for (int i = 0; i < element->children.size(); i++)
-  {
-    UiElement child = element->children[i];
-    remainderSize -= child.size.width.value;
-  }
-
   std::vector<UiElement *> growable;
   std::vector<UiElement *> shrinkable;
   for (int i = 0; i < element->children.size(); i++)
@@ -171,84 +178,100 @@ void GrowChildElements(UiElement *element)
     }
   }
 
-  while (remainderSize > 0 && growable.size() > 0)
+  if (element->direction == ROW)
   {
-    float32 smallest = growable[0]->size.width.value;
-    float32 secondSmallest = INFINITY;
-    float32 sizeToAdd = remainderSize;
-
-    // find smallest and second smallest
-    for (int i = 0; i < growable.size(); i++)
+    for (int i = 0; i < element->children.size(); i++)
     {
-      float32 width = growable[i]->size.width.value;
-      if (width < smallest)
+      UiElement child = element->children[i];
+      remainderSize -= child.size.width.value;
+    }
+
+    while (remainderSize > 0 && growable.size() > 0)
+    {
+      float32 smallest = growable[0]->size.width.value;
+      float32 secondSmallest = INFINITY;
+      float32 sizeToAdd = remainderSize;
+
+      // find smallest and second smallest
+      for (int i = 0; i < growable.size(); i++)
       {
-        secondSmallest = smallest;
-        smallest = width;
+        float32 width = growable[i]->size.width.value;
+        if (width < smallest)
+        {
+          secondSmallest = smallest;
+          smallest = width;
+        }
+
+        if (width > smallest)
+        {
+          secondSmallest = Min(secondSmallest, width);
+        }
       }
 
-      if (width > smallest)
+      if (secondSmallest != INFINITY)
       {
-        secondSmallest = Min(secondSmallest, width);
+        sizeToAdd = secondSmallest - smallest;
+      }
+
+      sizeToAdd = Min(sizeToAdd, remainderSize / (float32)growable.size());
+
+      for (int i = 0; i < growable.size(); i++)
+      {
+        if (growable[i]->size.width.value == smallest)
+        {
+          growable[i]->size.width.value += sizeToAdd;
+          remainderSize -= sizeToAdd;
+        }
       }
     }
 
-    if (secondSmallest != INFINITY)
+    while (remainderSize < 0 && shrinkable.size() > 0)
     {
-      sizeToAdd = secondSmallest - smallest;
-    }
+      float32 largest = shrinkable[0]->size.width.value;
+      float32 secondLargest = 0;
+      float32 sizeToRemove = remainderSize;
 
-    sizeToAdd = Min(sizeToAdd, remainderSize / (float32)growable.size());
-
-    for (int i = 0; i < growable.size(); i++)
-    {
-      if (growable[i]->size.width.value == smallest)
+      for (int i = 0; i < shrinkable.size(); i++)
       {
-        growable[i]->size.width.value += sizeToAdd;
-        remainderSize -= sizeToAdd;
+        float32 width = shrinkable[i]->size.width.value;
+        if (width > largest)
+        {
+          secondLargest = largest;
+          largest = width;
+        }
+        if (width < largest)
+          secondLargest = Max(secondLargest, width);
+      }
+
+      if (secondLargest != 0)
+      {
+        sizeToRemove = secondLargest - largest;
+      }
+
+      sizeToRemove = Max(sizeToRemove, remainderSize / (float32)shrinkable.size());
+
+      for (int i = 0; i < shrinkable.size(); i++)
+      {
+        if (shrinkable[i]->size.width.value == largest)
+        {
+          float32 previousWidth = shrinkable[i]->size.width.value;
+          shrinkable[i]->size.width.value += sizeToRemove; // sizeToRemove is negative
+          remainderSize -= (shrinkable[i]->size.width.value - previousWidth);
+
+          if (shrinkable[i]->size.width.value <= shrinkable[i]->size.minWidth)
+          {
+            shrinkable[i]->size.width.value = shrinkable[i]->size.minWidth;
+            shrinkable.erase(shrinkable.begin() + i--);
+          }
+        }
       }
     }
   }
-
-  while (remainderSize < 0 && shrinkable.size() > 0)
+  else if (growable.size() > 0 && remainderSize > 0)
   {
-    float32 largest = shrinkable[0]->size.width.value;
-    float32 secondLargest = 0;
-    float32 sizeToRemove = remainderSize;
-
-    for (int i = 0; i < shrinkable.size(); i++)
+    for (int i = 0; i < growable.size(); i++)
     {
-      float32 width = shrinkable[i]->size.width.value;
-      if (width > largest)
-      {
-        secondLargest = largest;
-        largest = width;
-      }
-      if (width < largest)
-        secondLargest = Max(secondLargest, width);
-    }
-
-    if (secondLargest != 0)
-    {
-      sizeToRemove = secondLargest - largest;
-    }
-
-    sizeToRemove = Max(sizeToRemove, remainderSize / (float32)shrinkable.size());
-
-    for (int i = 0; i < shrinkable.size(); i++)
-    {
-      if (shrinkable[i]->size.width.value == largest)
-      {
-        float32 previousWidth = shrinkable[i]->size.width.value;
-        shrinkable[i]->size.width.value += sizeToRemove; // sizeToRemove is negative
-        remainderSize -= (shrinkable[i]->size.width.value - previousWidth);
-
-        if (shrinkable[i]->size.width.value <= shrinkable[i]->size.minWidth)
-        {
-          shrinkable[i]->size.width.value = shrinkable[i]->size.minWidth;
-          shrinkable.erase(shrinkable.begin() + i--);
-        }
-      }
+      growable[i]->size.width.value = remainderSize;
     }
   }
 
@@ -264,12 +287,6 @@ void GrowChildElementsHeight(UiElement *element)
   float32 remainderSize = element->size.height.value;
   float32 childGaps = (element->children.size() - 1) * element->gap;
   remainderSize -= element->padding.top + element->padding.bottom + childGaps;
-
-  for (int i = 0; i < element->children.size(); i++)
-  {
-    UiElement child = element->children[i];
-    remainderSize -= child.size.height.value;
-  }
 
   std::vector<UiElement *> growable;
   std::vector<UiElement *> shrinkable;
@@ -294,84 +311,100 @@ void GrowChildElementsHeight(UiElement *element)
     }
   }
 
-  while (remainderSize > 0 && growable.size() > 0)
+  if (element->direction == COLUMN)
   {
-    float32 smallest = growable[0]->size.height.value;
-    float32 secondSmallest = INFINITY;
-    float32 sizeToAdd = remainderSize;
-
-    // find smallest and second smallest
-    for (int i = 0; i < growable.size(); i++)
+    for (int i = 0; i < element->children.size(); i++)
     {
-      float32 height = growable[i]->size.height.value;
-      if (height < smallest)
+      UiElement child = element->children[i];
+      remainderSize -= child.size.height.value;
+    }
+
+    while (remainderSize > 0 && growable.size() > 0)
+    {
+      float32 smallest = growable[0]->size.height.value;
+      float32 secondSmallest = INFINITY;
+      float32 sizeToAdd = remainderSize;
+
+      // find smallest and second smallest
+      for (int i = 0; i < growable.size(); i++)
       {
-        secondSmallest = smallest;
-        smallest = height;
+        float32 height = growable[i]->size.height.value;
+        if (height < smallest)
+        {
+          secondSmallest = smallest;
+          smallest = height;
+        }
+
+        if (height > smallest)
+        {
+          secondSmallest = Min(secondSmallest, height);
+        }
       }
 
-      if (height > smallest)
+      if (secondSmallest != INFINITY)
       {
-        secondSmallest = Min(secondSmallest, height);
+        sizeToAdd = secondSmallest - smallest;
+      }
+
+      sizeToAdd = Min(sizeToAdd, remainderSize / (float32)growable.size());
+
+      for (int i = 0; i < growable.size(); i++)
+      {
+        if (growable[i]->size.height.value == smallest)
+        {
+          growable[i]->size.height.value += sizeToAdd;
+          remainderSize -= sizeToAdd;
+        }
       }
     }
 
-    if (secondSmallest != INFINITY)
+    while (remainderSize < 0 && shrinkable.size() > 0)
     {
-      sizeToAdd = secondSmallest - smallest;
-    }
+      float32 largest = shrinkable[0]->size.height.value;
+      float32 secondLargest = 0;
+      float32 sizeToRemove = remainderSize;
 
-    sizeToAdd = Min(sizeToAdd, remainderSize / (float32)growable.size());
-
-    for (int i = 0; i < growable.size(); i++)
-    {
-      if (growable[i]->size.height.value == smallest)
+      for (int i = 0; i < shrinkable.size(); i++)
       {
-        growable[i]->size.height.value += sizeToAdd;
-        remainderSize -= sizeToAdd;
+        float32 height = shrinkable[i]->size.height.value;
+        if (height > largest)
+        {
+          secondLargest = largest;
+          largest = height;
+        }
+        if (height < largest)
+          secondLargest = Max(secondLargest, height);
+      }
+
+      if (secondLargest != 0)
+      {
+        sizeToRemove = secondLargest - largest;
+      }
+
+      sizeToRemove = Max(sizeToRemove, remainderSize / (float32)shrinkable.size());
+
+      for (int i = 0; i < shrinkable.size(); i++)
+      {
+        if (shrinkable[i]->size.height.value == largest)
+        {
+          float32 previousHeight = shrinkable[i]->size.height.value;
+          shrinkable[i]->size.height.value += sizeToRemove; // sizeToRemove is negative
+          remainderSize -= (shrinkable[i]->size.height.value - previousHeight);
+
+          if (shrinkable[i]->size.height.value <= shrinkable[i]->size.minHeight)
+          {
+            shrinkable[i]->size.height.value = shrinkable[i]->size.minHeight;
+            shrinkable.erase(shrinkable.begin() + i--);
+          }
+        }
       }
     }
   }
-
-  while (remainderSize < 0 && shrinkable.size() > 0)
+  else if (growable.size() > 0 && remainderSize > 0)
   {
-    float32 largest = shrinkable[0]->size.height.value;
-    float32 secondLargest = 0;
-    float32 sizeToRemove = remainderSize;
-
-    for (int i = 0; i < shrinkable.size(); i++)
+    for (int i = 0; i < growable.size(); i++)
     {
-      float32 height = shrinkable[i]->size.height.value;
-      if (height > largest)
-      {
-        secondLargest = largest;
-        largest = height;
-      }
-      if (height < largest)
-        secondLargest = Max(secondLargest, height);
-    }
-
-    if (secondLargest != 0)
-    {
-      sizeToRemove = secondLargest - largest;
-    }
-
-    sizeToRemove = Max(sizeToRemove, remainderSize / (float32)shrinkable.size());
-
-    for (int i = 0; i < shrinkable.size(); i++)
-    {
-      if (shrinkable[i]->size.height.value == largest)
-      {
-        float32 previousHeight = shrinkable[i]->size.height.value;
-        shrinkable[i]->size.height.value += sizeToRemove; // sizeToRemove is negative
-        remainderSize -= (shrinkable[i]->size.height.value - previousHeight);
-
-        if (shrinkable[i]->size.height.value <= shrinkable[i]->size.minHeight)
-        {
-          shrinkable[i]->size.height.value = shrinkable[i]->size.minHeight;
-          shrinkable.erase(shrinkable.begin() + i--);
-        }
-      }
+      growable[i]->size.height.value = remainderSize;
     }
   }
 
@@ -450,6 +483,12 @@ void RenderElementAndChildren(UiElement *element)
              element->position.x, element->position.y,
              element->size.width.value, element->textColor, TextAlign_Left, TextVAlign_Top);
   }
+  else if (element->imagePath)
+  {
+    DrawImage(loadedImages[element->imagePath],
+              element->position.x, element->position.y,
+              element->size.width.value, element->size.height.value);
+  }
   else
   {
     DrawFillRect(element->position.x,
@@ -490,9 +529,47 @@ void WrapTexts(UiElement *element)
   element->size.minHeight = wrappedHeight;
 }
 
+// TODO(Carlos): Do this on a different thread
+void LoadImages(UiElement *element)
+{
+  if (element->imagePath)
+  {
+    currentImages[element->imagePath] = true;
+    if (!loadedImages[element->imagePath])
+    {
+      loadedImages[element->imagePath] = DrawLoadImage(element->imagePath);
+    }
+  }
+
+  for (int i = 0; i < element->children.size(); i++)
+  {
+    element->children[i].parent = element;
+    LoadImages(&element->children[i]);
+  }
+}
+
+// TODO(Carlos): Do this on a different thread
+void UnloadImages()
+{
+  for (const auto &[imagePath, image] : loadedImages)
+  {
+    // image still on frame
+    if (currentImages[imagePath])
+    {
+      continue;
+    }
+
+    DrawDestroyImage(loadedImages[imagePath]);
+    loadedImages.erase(imagePath);
+  }
+}
+
 void Render()
 {
-  UiElement *root = &stack[0];
+  root = &stack[0];
+  LoadImages(root);
+  UnloadImages();
+  currentImages.clear();
 
   FixParentPointers(root);
 
@@ -500,12 +577,14 @@ void Render()
   GrowChildElements(root);
   WrapTexts(root);
   FitSizeHeight(root);
-  // GrowChildElementsHeight(root);
+  GrowChildElementsHeight(root);
 
   PositionElementAndChildren(root);
+
   RenderElementAndChildren(root);
 
-  // Clean up
+  Events();
+
   memset(stack, 0, sizeof(stack));
   stackTop = 0;
 }
@@ -530,4 +609,67 @@ void CloseElement()
     // TODO(Carlos) Render breaks when there are no elements.
     Render();
   }
+}
+
+void HandleHover(UiElement *element)
+{
+}
+
+void HandleHoverInit(UiElement *element)
+{
+  return HandleHover(element);
+}
+
+UiElement *Current()
+{
+  return &stack[stackTop];
+}
+
+// void IsHovering()
+// {
+//   eventsTop++;
+//   void fn = HandleHover(&stack[stackTop])
+//       events[eventsTop] = &;
+// }
+
+UiElement *FindElementByIdStep(const wchar_t *id, UiElement *element)
+{
+  if (element->id && std::wcscmp(element->id, id) == 0)
+  {
+    return element;
+  }
+
+  for (int i = 0; i < element->children.size(); i++)
+  {
+    UiElement *found = FindElementByIdStep(id, &element->children[i]);
+    if (found)
+    {
+      return found;
+    }
+  }
+
+  return 0;
+}
+
+UiElement *FindElementById(const wchar_t *id)
+{
+  return FindElementByIdStep(id, root);
+}
+
+bool PointerOver(const wchar_t *id)
+{
+  UiElement *element = FindElementById(id);
+  if (!element)
+  {
+    return false;
+  }
+
+  bool isInXBounds =
+      (platformState->xMousePos >= element->position.x) &&
+      (platformState->xMousePos <= element->position.x + element->size.width.value);
+  bool isInYBounds =
+      (platformState->yMousePos >= element->position.y) &&
+      (platformState->yMousePos <= element->position.y + element->size.height.value);
+
+  return isInXBounds && isInYBounds;
 }
